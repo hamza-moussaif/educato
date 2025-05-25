@@ -1,79 +1,69 @@
 import json
 from services.ai_service import get_llm_response
 
-def generate_educational_content(subject, grade, topic=None, learning_objectives=None):
+def generate_educational_content(subject, grade):
     """Generate educational content using AI."""
     print(f"\n=== Generating content ===")
     print(f"Subject: {subject}")
     print(f"Grade: {grade}")
-    print(f"Topic: {topic}")
-    print(f"Learning objectives: {learning_objectives}")
     
-    # Construire le prompt
-    prompt = f"""You are an educational content generator. Generate a 5-question multiple choice quiz about "{subject}" for {grade} level.
-    Return ONLY a valid JSON object in this exact format, with no additional text:
-    {{
-        "questions": [
-            {{
-                "question": "Question text",
-                "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-                "correct_answer": 0,
-                "explanation": "Explanation of the correct answer"
-            }}
-        ]
-    }}
+    prompt = f"""You are an expert teacher creating educational content. Create a multiple-choice question about {subject} for {grade} level students.
 
-    Important:
-    - Each question MUST have exactly 4 options
-    - The correct_answer must be an index (0-3) corresponding to the correct option
-    - Do not include any text before or after the JSON object
-    - Make sure the JSON is properly formatted with double quotes
-    - Generate 5 questions total
+    Follow this format exactly:
+    QUESTION: [Write a clear, engaging question]
+    OPTIONS:
+    1. [First option]
+    2. [Second option]
+    3. [Third option]
+    4. [Fourth option]
+    CORRECT_ANSWER: [Number 1-4]
+    EXPLANATION: [Brief explanation of why this is correct]
+
+    Guidelines:
+    - Make the question clear and appropriate for {grade} level
+    - Include exactly 4 options
+    - Make one option clearly correct
+    - Make other options plausible but incorrect
+    - Keep the explanation simple and educational
     """
     
     try:
-        # Appeler l'API Ollama
+        # Get response from Ollama
         response = get_llm_response(prompt)
         print("Raw response:", response)
         
-        # Parser la réponse JSON
-        try:
-            content = json.loads(response)
-            print("Parsed content:", content)
+        # Validate response format
+        if not response or len(response.strip()) < 10:
+            raise ValueError("Invalid response from AI model")
             
-            # Valider le format
-            if 'questions' not in content:
-                raise ValueError("Response missing 'questions' field")
+        # Normalize the response for validation
+        normalized_response = response.upper()
+        
+        # Define section headers with common typos
+        section_headers = {
+            'QUESTION': ['QUESTION:', 'QUESTION'],
+            'OPTIONS': ['OPTIONS:', 'OPTIONS'],
+            'CORRECT_ANSWER': ['CORRECT_ANSWER:', 'CORRECT_ANSWER', 'CORRECT ANSWER:', 'CORRECT ANSWER'],
+            'EXPLANATION': ['EXPLANATION:', 'EXPLANATION']
+        }
+        
+        # Check for each required section
+        missing_sections = []
+        for section, possible_headers in section_headers.items():
+            if not any(header in normalized_response for header in possible_headers):
+                missing_sections.append(section)
                 
-            for i, question in enumerate(content['questions']):
-                if 'options' not in question:
-                    raise ValueError(f"Question {i+1} missing 'options' field")
-                if len(question['options']) != 4:
-                    raise ValueError(f"Question {i+1} must have exactly 4 options")
-                if 'correct_answer' not in question:
-                    raise ValueError(f"Question {i+1} missing 'correct_answer' field")
-                if not isinstance(question['correct_answer'], int) or question['correct_answer'] not in range(4):
-                    raise ValueError(f"Question {i+1} correct_answer must be an integer between 0 and 3")
-                if 'explanation' not in question:
-                    raise ValueError(f"Question {i+1} missing 'explanation' field")
+        if missing_sections:
+            raise ValueError(f"Response missing required sections: {', '.join(missing_sections)}")
             
-            return content
-            
-        except json.JSONDecodeError as e:
-            print(f"Failed to parse response as JSON: {e}")
-            print("Raw response that failed to parse:", response)
-            # Essayer d'extraire le JSON de la réponse
-            import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                try:
-                    content = json.loads(json_match.group())
-                    print("Successfully extracted and parsed JSON:", content)
-                    return content
-                except json.JSONDecodeError:
-                    pass
-            raise ValueError("Failed to parse AI response as JSON")
+        # Check for placeholder text
+        placeholder_texts = ['[WRITE', '[NUMBER', '[YOUR', '[FIRST', '[SECOND', '[THIRD', '[FOURTH']
+        for placeholder in placeholder_texts:
+            if placeholder in normalized_response:
+                raise ValueError("Response contains placeholder text instead of actual content")
+                
+        return response
             
     except Exception as e:
-        print(f"Error generating content: {str(e)}")
+        print(f"Failed to generate content: {str(e)}")
         raise 

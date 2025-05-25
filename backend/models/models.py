@@ -15,17 +15,17 @@ class User(db.Model):
     contents = db.relationship('Content', backref='user', lazy=True)
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = password  # Store as plain text
 
     def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+        return self.password_hash == password  # Direct comparison
 
     def to_dict(self):
         return {
             'id': self.id,
             'username': self.username,
             'email': self.email,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
 class Request(db.Model):
@@ -44,7 +44,7 @@ class Request(db.Model):
             'user_id': self.user_id,
             'topic': self.topic,
             'level': self.level,
-            'date_created': self.date_created.isoformat(),
+            'date_created': self.date_created.isoformat() if self.date_created else None,
             'contents': [content.to_dict() for content in self.contents]
         }
 
@@ -52,11 +52,11 @@ class Content(db.Model):
     __tablename__ = 'contents'
     
     id = db.Column(db.Integer, primary_key=True)
-    request_id = db.Column(db.Integer, db.ForeignKey('requests.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    request_id = db.Column(db.Integer, db.ForeignKey('requests.id', ondelete='CASCADE'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     content_type = db.Column(db.String(50), nullable=False)  # e.g., 'qcm', 'exercise', 'summary'
-    content_data = db.Column(db.JSON, nullable=False)
+    content_data = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -68,6 +68,6 @@ class Content(db.Model):
             'title': self.title,
             'content_type': self.content_type,
             'content_data': self.content_data,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         } 

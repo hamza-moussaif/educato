@@ -42,7 +42,6 @@ def generate_content():
             
         data = request.get_json()
         print("Received data:", data)
-        print("Data type:", type(data))
         
         if not data:
             print("No data provided")
@@ -84,8 +83,7 @@ def generate_content():
             request_obj = Request(
                 user_id=user_id,
                 topic=subject,
-                level=grade,
-                content_type='qcm'
+                level=grade
             )
             db.session.add(request_obj)
             db.session.flush()
@@ -96,14 +94,41 @@ def generate_content():
                 request_id=request_obj.id,
                 title=f"QCM {subject} - {grade}",
                 content_type='qcm',
-                content_data=content
+                content_data=content  # Store the raw text response directly
             )
             db.session.add(content_obj)
             db.session.commit()
             
+            # Parse the generated content into a structured format
+            lines = content.strip().split('\n')
+            question = ""
+            options = []
+            correct_answer = ""
+            explanation = ""
+            
+            for line in lines:
+                line = line.strip()
+                if line.startswith('QUESTION:'):
+                    question = line.replace('QUESTION:', '').strip()
+                elif line.startswith('OPTIONS:'):
+                    continue
+                elif line.startswith('CORRECT_ANSWER:'):
+                    correct_answer = line.replace('CORRECT_ANSWER:', '').strip()
+                elif line.startswith('EXPLANATION:'):
+                    explanation = line.replace('EXPLANATION:', '').strip()
+                elif line and line[0].isdigit() and '. ' in line:
+                    options.append(line.split('. ', 1)[1].strip())
+            
+            structured_content = {
+                'question': question,
+                'options': options,
+                'correct_answer': correct_answer,
+                'explanation': explanation
+            }
+            
             response = jsonify({
                 'message': 'QCM generated successfully',
-                'content': content,
+                'content': structured_content,
                 'request_id': request_obj.id,
                 'content_id': content_obj.id
             })

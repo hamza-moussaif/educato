@@ -34,13 +34,20 @@ function Login() {
       await login(email, password);
       navigate("/dashboard");
     } catch (error) {
+      const errorMessage = error.response?.data?.error || "Failed to login";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to login",
+        description: errorMessage,
         status: "error",
         duration: 5000,
         isClosable: true,
       });
+
+      // Si les identifiants sont invalides, vider les champs
+      if (errorMessage === "Invalid credentials") {
+        setEmail("");
+        setPassword("");
+      }
     } finally {
       setLoading(false);
     }

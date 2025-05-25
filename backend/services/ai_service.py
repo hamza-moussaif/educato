@@ -6,10 +6,10 @@ import logging
 from flask import current_app
 
 OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'mistral')
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'mistral:latest')
 OLLAMA_API_URL = f"{OLLAMA_BASE_URL}/api/generate"
 MODEL_NAME = "mistral:latest"
-MODEL = "mistral"
+MODEL = "mistral:latest"
 
 def test_ollama_connection() -> Dict[str, Any]:
     """Test the connection to Ollama and return available models."""
@@ -87,109 +87,78 @@ def test_ollama_connection() -> Dict[str, Any]:
             'models': []
         }
 
-def get_llm_response(prompt, max_retries=2):
-    """Get response from Ollama API with retry logic."""
-    print(f"\n=== Calling Ollama API ===")
-    print(f"Model: {MODEL}")
-    print(f"Prompt: {prompt}")
-    
-    data = {
-        "model": MODEL,
-        "prompt": prompt,
-        "stream": False,
-        "options": {
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "max_tokens": 500
-        }
-    }
-    
-    for attempt in range(max_retries + 1):
+def get_llm_response(prompt: str, max_retries: int = 3) -> str:
+    """Get a response from the LLM model via Ollama."""
+    for attempt in range(max_retries):
         try:
-            print(f"Attempt {attempt + 1}/{max_retries + 1}")
-            
-            # Vérifier si Ollama est en cours d'exécution
+            # First, check if Ollama is running and get available models
             try:
-                health_check = requests.get("http://localhost:11434/api/tags", timeout=5)
-                if health_check.status_code != 200:
-                    print("Ollama is not responding correctly")
-                    raise ConnectionError("Ollama is not responding correctly")
-            except requests.exceptions.RequestException as e:
-                print(f"Ollama health check failed: {str(e)}")
-                raise ConnectionError(f"Ollama is not running: {str(e)}")
-            
-            # Faire la requête principale avec un timeout plus long
-            response = requests.post(
-                OLLAMA_API_URL,
-                json=data,
-                timeout=30
-            )
-            
-            print(f"Response status: {response.status_code}")
-            
-            if response.status_code == 200:
-                try:
-                    result = response.json()
-                    print("Raw API response:", result)
-                    
-                    if 'response' not in result:
-                        raise ValueError("No 'response' field in API response")
-                    
-                    # Nettoyer la réponse pour s'assurer qu'elle est un JSON valide
-                    response_text = result['response'].strip()
-                    print("Cleaned response text:", response_text)
-                    
-                    # Essayer de parser la réponse comme JSON
-                    try:
-                        json_response = json.loads(response_text)
-                        return json.dumps(json_response)  # Retourner un JSON valide
-                    except json.JSONDecodeError:
-                        # Si ce n'est pas un JSON valide, essayer d'extraire le JSON
-                        import re
-                        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                        if json_match:
-                            try:
-                                json_response = json.loads(json_match.group())
-                                return json.dumps(json_response)
-                            except json.JSONDecodeError:
-                                pass
-                        
-                        # Si on ne peut pas extraire de JSON valide, créer un JSON par défaut
-                        default_response = {
-                            "error": "Could not parse AI response as JSON",
-                            "raw_response": response_text
-                        }
-                        return json.dumps(default_response)
-                    
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON: {str(e)}")
-                    print("Raw response:", response.text)
-                    if attempt == max_retries:
-                        raise ValueError("Failed to decode API response as JSON")
-                    continue
-                    
-            else:
-                print(f"API error: {response.status_code}")
-                print("Error response:", response.text)
-                if attempt == max_retries:
-                    raise ValueError(f"API returned status code {response.status_code}")
-                continue
+                models_response = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=10)
+                models_response.raise_for_status()
+                available_models = models_response.json().get('models', [])
                 
-        except requests.exceptions.Timeout as e:
-            print(f"Timeout error: {str(e)}")
-            if attempt == max_retries:
-                raise ConnectionError(f"Timeout while connecting to Ollama API: {str(e)}")
-            print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
-            continue
+                if not available_models:
+                    raise Exception("No models available. Please install a model first.")
+                    
+                # Use the first available model if our preferred model isn't available
+                model_to_use = OLLAMA_MODEL
+                if OLLAMA_MODEL not in [m.get('name', '') for m in available_models]:
+                    model_to_use = available_models[0].get('name', 'mistral:latest')
+                    print(f"Warning: {OLLAMA_MODEL} not found, using {model_to_use} instead")
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"Failed to connect to Ollama. Is it running? Error: {str(e)}")
+            
+            # Make the actual request
+            print(f"Sending request to Ollama with model: {model_to_use}")
+            print(f"Prompt: {prompt}")
+            
+            # Simplified request format with increased timeout
+            response = requests.post(
+                f"{OLLAMA_BASE_URL}/api/generate",
+                json={
+                    "model": model_to_use,
+                    "prompt": prompt,
+                    "stream": False
+                },
+                timeout=120  # Increase timeout to 120 seconds
+            )
+            response.raise_for_status()
+            result = response.json()
+            print(f"Ollama response: {result}")
+            
+            if 'response' not in result:
+                raise Exception("No response field in Ollama response")
+                
+            # Clean up the response text
+            response_text = result['response'].strip()
+            if not response_text:
+                raise Exception("Empty response from Ollama")
+                
+            return response_text
+            
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                print(f"Timeout occurred, retrying... (attempt {attempt + 1}/{max_retries})")
+                continue
+            raise Exception("Request timed out after multiple retries")
             
         except requests.exceptions.RequestException as e:
-            print(f"Request error: {str(e)}")
-            if attempt == max_retries:
-                raise ConnectionError(f"Failed to connect to Ollama API: {str(e)}")
-            print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
-            continue
+            print(f"Error getting LLM response: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Response content: {e.response.text}")
+            if attempt < max_retries - 1:
+                print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
+                continue
+            raise Exception(f"Failed to get response from AI model: {str(e)}")
             
-    raise ConnectionError("All retry attempts failed")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            import traceback
+            print("Traceback:", traceback.format_exc())
+            if attempt < max_retries - 1:
+                print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
+                continue
+            raise
 
 def generate_qcm(topic: str, level: str) -> Dict[str, Any]:
     """Generate a QCM (multiple choice quiz) on a given topic."""

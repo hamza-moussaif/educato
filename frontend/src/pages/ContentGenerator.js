@@ -9,9 +9,6 @@ import {
   FormLabel,
   Select,
   Button,
-  Radio,
-  RadioGroup,
-  Stack,
   useToast,
   useColorModeValue,
   ScaleFade,
@@ -23,17 +20,19 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
-  Link,
+  Card,
+  CardBody,
+  CardHeader,
+  Icon,
 } from "@chakra-ui/react";
 import { useAuth } from "../contexts/AuthContext";
+import { FaQuestionCircle, FaList, FaLightbulb } from "react-icons/fa";
 
 function ContentGenerator() {
   const [subject, setSubject] = useState("");
   const [grade, setGrade] = useState("");
-  const [contentType, setContentType] = useState("quiz");
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState(null);
-  const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [error, setError] = useState(null);
   const { currentUser } = useAuth();
   const toast = useToast();
@@ -57,7 +56,6 @@ function ContentGenerator() {
 
     setLoading(true);
     setGeneratedContent(null);
-    setSelectedAnswer(null);
     setError(null);
 
     try {
@@ -72,7 +70,6 @@ function ContentGenerator() {
           body: JSON.stringify({
             subject,
             grade,
-            content_type: contentType,
           }),
         }
       );
@@ -80,24 +77,10 @@ function ContentGenerator() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (
-          data.error &&
-          data.error.includes("Timeout while connecting to Ollama API")
-        ) {
-          throw new Error(
-            "The AI service is currently unavailable. Please make sure Ollama is running and try again."
-          );
-        }
-        throw new Error(
-          data.error || data.message || "Failed to generate content"
-        );
+        throw new Error(data.error || "Failed to generate content");
       }
 
-      if (data.message === "This endpoint accepts POST requests") {
-        throw new Error("API endpoint is not properly configured");
-      }
-
-      setGeneratedContent(data.content || data);
+      setGeneratedContent(data.content);
       toast({
         title: "Success",
         description: "Content generated successfully",
@@ -119,229 +102,161 @@ function ContentGenerator() {
     }
   };
 
-  const checkAnswer = () => {
-    if (selectedAnswer === null) {
-      toast({
-        title: "Warning",
-        description: "Please select an answer",
-        status: "warning",
-        duration: 3000,
-        isClosable: true,
-      });
-      return;
-    }
-
-    const isCorrect = selectedAnswer === generatedContent.correct_answer;
-    toast({
-      title: isCorrect ? "Correct!" : "Incorrect",
-      description: generatedContent.explanation,
-      status: isCorrect ? "success" : "error",
-      duration: 5000,
-      isClosable: true,
-    });
-  };
-
   return (
     <Container maxW="container.md" py={10}>
       <VStack spacing={8}>
         <Box textAlign="center">
-          <Heading color={textColor}>Generate Educational Content</Heading>
-          <Text mt={2} color="brand.500">
-            Create personalized educational content for your students
+          <Heading color={textColor} size="2xl" mb={4}>
+            Generate QCM Question
+          </Heading>
+          <Text fontSize="lg" color="brand.500">
+            Create a single multiple choice question for your students
           </Text>
         </Box>
 
         {error && (
-          <Alert
-            status="error"
-            borderRadius="md"
-            flexDirection="column"
-            alignItems="flex-start"
-            p={4}
-          >
-            <Flex>
-              <AlertIcon />
-              <AlertTitle>Error</AlertTitle>
-            </Flex>
-            <AlertDescription mt={2}>
-              {error}
-              {error.includes("Ollama") && (
-                <Box mt={2}>
-                  <Text fontSize="sm">To fix this issue:</Text>
-                  <Text fontSize="sm" mt={1}>
-                    1. Make sure Ollama is installed and running
-                  </Text>
-                  <Text fontSize="sm">
-                    2. Run <code>ollama pull mistral</code> in your terminal
-                  </Text>
-                  <Text fontSize="sm">3. Restart the Flask server</Text>
-                  <Text fontSize="sm" mt={2}>
-                    Need help? Check the{" "}
-                    <Link
-                      href="https://github.com/ollama/ollama"
-                      color="brand.500"
-                      isExternal
-                    >
-                      Ollama documentation
-                    </Link>
-                  </Text>
-                </Box>
-              )}
-            </AlertDescription>
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <Box
+        <Card
           w="100%"
-          p={8}
-          borderWidth={1}
-          borderRadius="lg"
           bg={bgColor}
           borderColor={borderColor}
-          boxShadow="sm"
-          transition="all 0.3s"
-          _hover={{ boxShadow: "md" }}
+          borderWidth={1}
+          borderRadius="xl"
+          boxShadow="lg"
         >
-          <form onSubmit={handleSubmit}>
-            <VStack spacing={6}>
-              <FormControl isRequired>
-                <FormLabel color={textColor}>Subject</FormLabel>
-                <Select
-                  placeholder="Select subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  bg="white"
-                  borderColor="brand.300"
-                  _hover={{ borderColor: "brand.400" }}
-                  _focus={{
-                    borderColor: "brand.500",
-                    boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
-                  }}
+          <CardBody>
+            <form onSubmit={handleSubmit}>
+              <VStack spacing={6}>
+                <FormControl isRequired>
+                  <FormLabel color={textColor} fontSize="lg">
+                    Subject
+                  </FormLabel>
+                  <Select
+                    placeholder="Select subject"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    bg="white"
+                    borderColor="brand.300"
+                    size="lg"
+                    _hover={{ borderColor: "brand.400" }}
+                    _focus={{
+                      borderColor: "brand.500",
+                      boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
+                    }}
+                  >
+                    <option value="mathematics">Mathematics</option>
+                    <option value="science">Science</option>
+                    <option value="history">History</option>
+                    <option value="literature">Literature</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel color={textColor} fontSize="lg">
+                    Grade Level
+                  </FormLabel>
+                  <Select
+                    placeholder="Select grade"
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    bg="white"
+                    borderColor="brand.300"
+                    size="lg"
+                    _hover={{ borderColor: "brand.400" }}
+                    _focus={{
+                      borderColor: "brand.500",
+                      boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
+                    }}
+                  >
+                    <option value="elementary">Elementary</option>
+                    <option value="middle">Middle School</option>
+                    <option value="high">High School</option>
+                  </Select>
+                </FormControl>
+
+                <Button
+                  type="submit"
+                  colorScheme="brand"
+                  width="100%"
+                  size="lg"
+                  isLoading={loading}
+                  bg="brand.400"
+                  _hover={{ bg: "brand.500" }}
+                  loadingText="Generating..."
+                  spinner={<Spinner color="white" />}
                 >
-                  <option value="mathematics">Mathematics</option>
-                  <option value="science">Science</option>
-                  <option value="history">History</option>
-                  <option value="literature">Literature</option>
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel color={textColor}>Grade Level</FormLabel>
-                <Select
-                  placeholder="Select grade"
-                  value={grade}
-                  onChange={(e) => setGrade(e.target.value)}
-                  bg="white"
-                  borderColor="brand.300"
-                  _hover={{ borderColor: "brand.400" }}
-                  _focus={{
-                    borderColor: "brand.500",
-                    boxShadow: "0 0 0 1px var(--chakra-colors-brand-500)",
-                  }}
-                >
-                  <option value="elementary">Elementary</option>
-                  <option value="middle">Middle School</option>
-                  <option value="high">High School</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel color={textColor}>Content Type</FormLabel>
-                <RadioGroup value={contentType} onChange={setContentType}>
-                  <Stack direction="row" spacing={4}>
-                    <Radio value="quiz" colorScheme="brand">
-                      Quiz
-                    </Radio>
-                    <Radio value="lesson" colorScheme="brand">
-                      Lesson Plan
-                    </Radio>
-                    <Radio value="exercise" colorScheme="brand">
-                      Exercise
-                    </Radio>
-                  </Stack>
-                </RadioGroup>
-              </FormControl>
-
-              <Button
-                type="submit"
-                colorScheme="brand"
-                width="100%"
-                isLoading={loading}
-                bg="brand.400"
-                _hover={{ bg: "brand.500" }}
-                loadingText="Generating..."
-                spinner={<Spinner color="white" />}
-              >
-                Generate Content
-              </Button>
-            </VStack>
-          </form>
-        </Box>
+                  Generate Question
+                </Button>
+              </VStack>
+            </form>
+          </CardBody>
+        </Card>
 
         <ScaleFade in={!!generatedContent} initialScale={0.9}>
           {generatedContent && (
-            <Box
+            <Card
               w="100%"
-              p={8}
-              borderWidth={1}
-              borderRadius="lg"
               bg={cardBgColor}
               borderColor={borderColor}
-              boxShadow="md"
+              borderWidth={1}
+              borderRadius="xl"
+              boxShadow="xl"
             >
-              <VStack spacing={6} align="stretch">
-                <Flex justify="space-between" align="center">
-                  <Heading size="md" color={textColor}>
-                    {contentType.charAt(0).toUpperCase() + contentType.slice(1)}
-                  </Heading>
-                  <Badge colorScheme="brand" fontSize="sm">
-                    {grade.charAt(0).toUpperCase() + grade.slice(1)}
-                  </Badge>
-                </Flex>
+              <CardHeader>
+                <Heading size="md" color={textColor}>
+                  Generated Question
+                </Heading>
+              </CardHeader>
 
-                <Divider borderColor={borderColor} />
+              <CardBody>
+                <VStack spacing={6} align="stretch">
+                  {/* Question */}
+                  <Box p={4} bg="brand.50" borderRadius="md">
+                    <Text fontSize="lg" fontWeight="bold" mb={2}>
+                      Question:
+                    </Text>
+                    <Text fontSize="md">{generatedContent.question}</Text>
+                  </Box>
 
-                <Box>
-                  <Text fontSize="lg" color={textColor} mb={4}>
-                    {generatedContent.question || generatedContent.content}
-                  </Text>
+                  {/* Options */}
+                  <Box p={4} bg="brand.50" borderRadius="md">
+                    <Text fontSize="lg" fontWeight="bold" mb={2}>
+                      Options:
+                    </Text>
+                    <VStack spacing={2} align="stretch">
+                      {generatedContent.options.map((option, index) => (
+                        <Box
+                          key={index}
+                          p={2}
+                          bg="white"
+                          borderRadius="md"
+                          borderWidth={1}
+                          borderColor="brand.200"
+                        >
+                          <Text>
+                            {index + 1}. {option}
+                          </Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </Box>
 
-                  {generatedContent.options && (
-                    <RadioGroup
-                      onChange={(value) => setSelectedAnswer(parseInt(value))}
-                      value={selectedAnswer}
-                    >
-                      <Stack spacing={4}>
-                        {generatedContent.options.map((option, index) => (
-                          <Radio
-                            key={index}
-                            value={index.toString()}
-                            colorScheme="brand"
-                            borderColor="brand.300"
-                            _hover={{ borderColor: "brand.400" }}
-                          >
-                            {option}
-                          </Radio>
-                        ))}
-                      </Stack>
-                    </RadioGroup>
-                  )}
-
-                  {generatedContent.options && (
-                    <Button
-                      mt={6}
-                      colorScheme="brand"
-                      onClick={checkAnswer}
-                      isDisabled={selectedAnswer === null}
-                      bg="brand.400"
-                      _hover={{ bg: "brand.500" }}
-                    >
-                      Check Answer
-                    </Button>
-                  )}
-                </Box>
-              </VStack>
-            </Box>
+                  {/* Explanation */}
+                  <Box p={4} bg="brand.50" borderRadius="md">
+                    <Text fontSize="lg" fontWeight="bold" mb={2}>
+                      Explanation:
+                    </Text>
+                    <Text fontSize="md">{generatedContent.explanation}</Text>
+                  </Box>
+                </VStack>
+              </CardBody>
+            </Card>
           )}
         </ScaleFade>
       </VStack>

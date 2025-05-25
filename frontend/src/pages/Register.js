@@ -35,13 +35,19 @@ function Register() {
       await register(username, email, password);
       navigate("/dashboard");
     } catch (error) {
+      const errorMessage = error.response?.data?.error || "Failed to register";
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to register",
+        description: errorMessage,
         status: "error",
         duration: 5000,
         isClosable: true,
       });
+
+      // Si l'email est déjà enregistré, vider le champ email
+      if (errorMessage === "Email already registered") {
+        setEmail("");
+      }
     } finally {
       setLoading(false);
     }

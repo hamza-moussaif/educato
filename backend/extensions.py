@@ -8,7 +8,7 @@ db = SQLAlchemy()
 jwt = JWTManager()
 cors = CORS(
     resources={r"/*": {
-        "origins": "http://localhost:3000",
+        "origins": ["http://localhost:3000"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True,

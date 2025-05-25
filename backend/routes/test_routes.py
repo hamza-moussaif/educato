@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from services.content_generator import generate_educational_content
 import json
+from models.models import User
+from extensions import db
 
 test_bp = Blueprint('test', __name__, url_prefix='/api/test')
 
@@ -74,4 +76,46 @@ def test_generate():
         return jsonify({
             'error': str(e),
             'type': type(e).__name__
-        }), 500 
+        }), 500
+
+@test_bp.route('/users', methods=['GET'])
+def list_users():
+    """List all users (development only)"""
+    try:
+        users = User.query.all()
+        return jsonify({
+            'users': [user.to_dict() for user in users]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@test_bp.route('/create-test-user', methods=['POST'])
+def create_test_user():
+    """Create a test user (development only)"""
+    try:
+        # Vérifier si l'utilisateur existe déjà
+        test_user = User.query.filter_by(email='test@example.com').first()
+        if test_user:
+            return jsonify({
+                'message': 'Test user already exists',
+                'user': test_user.to_dict()
+            }), 200
+
+        # Créer un nouvel utilisateur de test
+        from werkzeug.security import generate_password_hash
+        test_user = User(
+            username='testuser',
+            email='test@example.com',
+            password_hash=generate_password_hash('password123')
+        )
+        db.session.add(test_user)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Test user created successfully',
+            'user': test_user.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500 

@@ -41,15 +41,25 @@ export function AuthProvider({ children }) {
   };
 
   const register = async (username, email, password) => {
-    const response = await axios.post("/api/auth/register", {
-      username,
-      email,
-      password,
-    });
-    const { token, user } = response.data;
-    localStorage.setItem("token", token);
-    setCurrentUser(user);
-    return user;
+    console.log("Registering user:", { username, email });
+    try {
+      const response = await axios.post("/api/auth/register", {
+        username,
+        email,
+        password,
+      });
+      console.log("Registration response:", response.data);
+      const { token, user } = response.data;
+      localStorage.setItem("token", token);
+      setCurrentUser(user);
+      return user;
+    } catch (error) {
+      console.error(
+        "Registration error:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   };
 
   const logout = () => {
